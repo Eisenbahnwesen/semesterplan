@@ -9,7 +9,7 @@ def load_data():
         return None, []
     with open(DATA_FILE, "r", encoding="utf-8") as f:
         data = json.load(f)
-    return data["modules"], data["logs"]
+    return data.get("modules"), data.get("logs", [])
 
 
 def save_data(modules, logs):

@@ -1,24 +1,18 @@
 from datetime import date, datetime
 
-SEMESTER_START_WEEK = 15  # KW 15 = Semesterstart
-
-
 def _days_until(exam_date_str):
     exam = datetime.strptime(exam_date_str, "%Y-%m-%d").date()
     return (exam - date.today()).days
 
 
-def _weeks_elapsed():
-    current_week = date.today().isocalendar()[1]
-    return max(current_week - SEMESTER_START_WEEK + 1, 1)
-
-
 def compute_status(modules, logs):
-    weeks = _weeks_elapsed()
+    current_week = date.today().isocalendar()[1]
     result = []
 
     for module in modules:
         days_left = _days_until(module["exam_date"])
+        start_week = module.get("start_week", current_week)
+        weeks_tracked = max(current_week - start_week + 1, 1)
 
         attended = sum(
             len(log["attended"])
@@ -31,21 +25,24 @@ def compute_status(modules, logs):
             if log["module"] == module["name"]
         )
 
-        sessions_per_week = sum(st["per_week"] for st in module["session_types"])
-        deficit = max(sessions_per_week * weeks - attended, 0)
+        sessions_per_week = len(module.get("sessions", []))
+        deficit = max(sessions_per_week * weeks_tracked - attended, 0)
 
-        urgency = 100 / days_left if days_left > 0 else 10.0
+        # Wie viele Wochen bis zur Prüfung?
+        weeks_left = max(days_left / 7, 0.5)
+        # Wie groß ist der Rückstand relativ zu den verbleibenden Wochen?
+        catchup_pressure = deficit / weeks_left
+
         score = (
-            module["ects"]       * 1.5
-            + module["difficulty"] * 2.0
-            + deficit              * 3.0
-            + urgency              * 10.0
-            + (5.0 if review_needed else 0.0)
+            module["ects"]       * 1.0
+            + module["difficulty"] * 1.5
+            + catchup_pressure     * 10.0
+            + (3.0 if review_needed else 0.0)
         )
 
-        if days_left < 14 or score > 40:
+        if days_left < 28 or (days_left < 56 and deficit > 3):
             priority = "DRINGEND"
-        elif deficit > 2 or score > 20:
+        elif catchup_pressure > 1.0 or deficit > 3:
             priority = "ZURUECKGEFALLEN"
         else:
             priority = "IM PLAN"

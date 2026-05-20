@@ -1,1 +1,1 @@
-#include "topic.h"
+// replaced by module.h (header-only struct)
